@@ -1,137 +1,245 @@
-#  Multi-Department AI System (Prompt-Orchestrated Multi-Agent Architecture)
+# Multi-Department AI System
 
-##  Project Overview
+**Prompt-Orchestrated Multi-Agent Architecture with FastAPI**
 
-This project implements a **multi-department AI system** using:
-
--  Groq LLM (LLaMA 3.1)
-- LangChain (LCEL - Modern Syntax)
--  Prompt Engineering
--  Role-based Department Isolation
--  Multi-department Response Merging
-
-The system simulates an IT company with multiple departments such as:
-
-- HR
-- Engineering
-- Sales
-- Finance
-- Support
-
-It intelligently routes user queries to the correct department(s) and merges responses when necessary.
+A smart AI system that routes user queries to the correct department, retrieves relevant company policy information, and returns a professional answer — all via a REST API.
 
 ---
 
-##  Architecture
+## Tech Stack
+
+- **LLM** — Groq (LLaMA 3.1 8B Instant)
+- **Framework** — LangChain (LCEL)
+- **Vector Store** — FAISS with metadata filtering
+- **Embeddings** — HuggingFace `all-MiniLM-L6-v2`
+- **API** — FastAPI + Uvicorn
+- **Environment** — Python-dotenv
+
+---
+
+## Departments
+
+- **HR** — Leave, Hiring, Payroll, Benefits
+- **Engineering** — Architecture, Deployment, APIs
+- **Sales** — Pricing, Packages, Proposals
+- **Finance** — Invoices, Payment Terms, Billing
+- **Support** — Login Issues, Tickets, Complaints
+
+---
+
+## Architecture
+
+```
 User Query
-↓
-LLM Router (JSON classification)
-↓
-Department Chains (Role-based prompts)
-↓
-Refusal Validation
-↓
-Merge Layer (if multiple departments)
-↓
-Final Unified Response
+    ↓
+FastAPI  →  /query endpoint
+    ↓
+LLM Router  →  classifies query into department(s)
+    ↓
+FAISS RAG  →  retrieves relevant chunks per department
+    ↓
+LLM  →  generates department answer
+    ↓
+Merge Layer  →  combines if multiple departments
+    ↓
+JSON Response
+```
 
+---
 
-##  How It Works
+## How It Works
 
-1 Router Layer
-An LLM-based router classifies user queries into department(s) using structured JSON output.
+### Step 1 — Router
+The LLM reads the query and returns a JSON list of relevant departments.
 
-Example:
 ```json
-{"departments": ["Sales", "Finance"]}
+{ "departments": ["Sales", "Finance"] }
+```
 
-2 Department Layer
+If the router returns empty, it falls back to searching all departments.
 
-Each department is implemented as an isolated role-based prompt with strict scope enforcement.
+### Step 2 — RAG Per Department
+Each department:
+- Filters FAISS using metadata `{"department": "Finance"}`
+- Retrieves top 4 relevant chunks from the policy PDF
+- Passes chunks as context to the LLM with a role-based prompt
 
-If a query does not belong to a department, it responds with:
+If no documents are found, it returns:
+```
+The requested information is not available in company records.
+```
 
-This query does not fall under my department.
+### Step 3 — Merge
+If multiple departments respond, a senior manager prompt merges all answers into one clean, professional response.
 
-3 Validation Layer
+### Step 4 — FastAPI
+The pipeline is exposed as a REST API with 4 endpoints:
 
-If:
+```
+GET   /         →  Welcome message
+GET   /health   →  Server health check
+POST  /query    →  Full pipeline (route + RAG + merge + answer)
+POST  /route    →  Routing decision only (no RAG)
+```
 
-Router returns empty list → clarification requested
+---
 
-Any department refuses → clarification requested
+## Project Structure
 
-4 merge layer
+```
+multi_department_ai/
+│
+├── api.py                        # FastAPI application
+├── main.py                       # Terminal-based pipeline
+├── rag_setup.py                  # FAISS index builder with metadata
+├── rag_section.py                # Section-based chunking (alternate)
+├── rag_semantic.py               # Semantic chunking (alternate)
+│
+├── faiss_metadata/               # Saved FAISS vector index
+│   ├── index.faiss
+│   └── index.pkl
+│
+├── data/
+│   └── NovaTech_Corporate_policy.pdf
+│
+├── .env                          # API keys (do not share or commit)
+├── .gitignore
+├── requirements.txt
+└── README.md
+```
 
-If multiple departments respond, a senior manager prompt merges responses into a single professional output.
+---
 
+## Setup & Installation
 
-## Installation & Setup
+**1. Clone the repository**
 
-1  Clone Repository
+```bash
 git clone <your-repo-url>
 cd multi_department_ai
+```
 
+**2. Create and activate virtual environment**
 
-2 Create Virtual Environment
+```bash
 python -m venv venv
 
-Activate:
-Windows:
+# Windows
 venv\Scripts\activate
-Mac/Linux:
+
+# Mac/Linux
 source venv/bin/activate
+```
 
-3 Install Dependencies
+**3. Install dependencies**
+
+```bash
 pip install -r requirements.txt
+pip install fastapi uvicorn
+```
 
-4 Add Groq API Key
-Create a .env file:
+**4. Add your Groq API key**
 
+Create a `.env` file in the project root:
+
+```
 GROQ_API_KEY=your_groq_api_key_here
+```
 
-5 Run Application
-python main.py
+**5. Build the FAISS index** (one-time setup)
 
-
-6 Example Queries
-
-### Sales Queries
-- What pricing plans do you offer?
-- Do you provide enterprise packages?
-- Can you share a quotation for your AI solution?
-
-### Finance Queries
-- What are your payment terms?
-- How is the invoice generated?
-- When are invoices issued?
-
-### HR Queries
-- How can I apply for leave?
-- What is the salary processing cycle?
-- What employee benefits are offered?
-
-### Engineering Queries
-- We are facing a deployment issue in production.
-- What architecture does your platform use?
-- Is your API REST-based?
-
-### Support Queries
-- I cannot log into my account.
-- How do I reset my password?
-- The dashboard is not loading properly.
+```bash
+python rag_setup.py
+```
 
 ---
 
-## Combined / Multi-Department Queries
+## Running the Application
 
-The system also supports queries that belong to multiple departments.  
-It routes the query to all relevant departments and merges their responses into a single unified answer.
+**Option A — Terminal mode**
 
-### Examples:
+```bash
+python main.py
+```
 
-- Client wants pricing and invoice details.
-- Please provide pricing structure along with payment terms.
-- We need a proposal including pricing model and billing process.
-- Explain your enterprise package and invoice generation workflow.
-- Share quotation details and outline your payment schedule.
+**Option B — API mode**
+
+```bash
+uvicorn api:app --reload
+```
+
+Then open: `http://127.0.0.1:8000/docs` for the interactive Swagger UI.
+
+---
+
+## API Example
+
+**Request**
+
+```bash
+POST /query
+Content-Type: application/json
+
+{
+  "query": "What are the payment terms?"
+}
+```
+
+**Response**
+
+```json
+{
+  "query": "What are the payment terms?",
+  "departments_routed": ["Finance"],
+  "answer": "The standard payment terms are Net 30, meaning payment is due 30 days from the invoice date. Custom contracts may define alternate schedules."
+}
+```
+
+---
+
+## Example Queries to Test
+
+**Single department queries**
+
+```
+What pricing plans do you offer?          →  Sales
+What are the payment terms?               →  Finance
+How can I apply for leave?                →  HR
+I cannot log into my account.             →  Support
+What architecture does your platform use? →  Engineering
+```
+
+**Multi-department queries**
+
+```
+Please provide pricing structure along with payment terms.
+We need a proposal including pricing model and billing process.
+Explain your enterprise package and invoice generation workflow.
+```
+
+---
+
+## Chunking Strategy
+
+The corporate policy PDF is processed using **Section-Based Chunking**:
+
+- The full PDF text is split using a regex pattern on numbered sections (`1.`, `2.`, `3.` ...)
+- Each chunk is tagged with a department label based on keyword matching
+- These metadata labels enable filtered retrieval per department at query time
+
+```python
+sections = re.split(r"\n\d+\.\s", full_text)
+
+Document(
+    page_content=text,
+    metadata={"department": "Finance"}
+)
+```
+
+---
+
+## Important Notes
+
+- Never commit your `.env` file — add it to `.gitignore`
+- Run `rag_setup.py` once before starting the API to build the FAISS index
+- The `faiss_metadata/` folder must exist before running `api.py` or `main.py`
