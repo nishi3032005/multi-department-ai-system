@@ -13,6 +13,7 @@ A smart AI system that routes user queries to the correct department, retrieves 
 - **Vector Store** — FAISS with metadata filtering
 - **Embeddings** — HuggingFace `all-MiniLM-L6-v2`
 - **API** — FastAPI + Uvicorn
+- **PDF Processing** — PDFPlumber, pdf2docx
 - **Environment** — Python-dotenv
 
 ---
@@ -237,6 +238,33 @@ Document(
 ```
 
 ---
+## PDF Loader Research
+
+Tested 4 different PDF loaders to find the best one for invoice extraction:
+
+Loader 1 — PyPDFLoader       →  motelone_20230120.pdf       Broken characters
+Loader 2 — PyMuPDFLoader     →  hilton_20230829.pdf         Slightly better
+Loader 3 — PDFPlumberLoader  →  cyberport_20230321.pdf      Cleanest output
+Loader 4 — PDFMinerLoader    →  europcar_20231009.pdf       Worst output
+
+Winner — PDFPlumberLoader preserved invoice structure best.
+
+## PDF to DOCX Conversion
+
+Since PDF loaders gave broken output, invoices are converted to DOCX first.
+DOCX preserves tables, headings, images and exact layout.
+
+Run converter:
+    python pdf_to_docx.py   →  saves to invoices_docx/
+    python pdf_to_txt.py    →  saves to invoices_txt/
+
+Run the converter:
+bashpython pdf_to_docx.py
+This reads all PDFs from invoices/ and saves DOCX files to invoices_docx/.
+Run TXT converter:
+bashpython pdf_to_txt.py
+This reads all PDFs from invoices/ and saves TXT files to invoices_txt/.
+
 
 ## Important Notes
 
